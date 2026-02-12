@@ -1,0 +1,1173 @@
+js
+const SUPABASE_URL = "https://ozjvplcthozynncdtpdo.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_zaftlPa_5aGJ8TvR7ht_yA_Xj2aN_pH";
+
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>일일업무일지 (PDF 동일 항목)</title>
+
+  <!-- Supabase JS (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    :root{
+      --line:#7f7f7f;           /* 내부 선(연회색) */
+      --line-strong:#333;       /* 외곽/강조선 */
+      --soft:#efefef;           /* 헤더 배경 */
+      --sum:#fff200;            /* PDF 노란 합계 */
+      --muted:#666;
+      --font: "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    }
+    body{margin:0;background:#f3f4f6;font-family:var(--font);color:#111}
+    .page{max-width:1120px;margin:22px auto;padding:0 12px}
+    .sheet{background:#fff;border:1px solid #d1d5db;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:18px}
+
+    .top{display:grid;grid-template-columns:1fr 320px;gap:12px;align-items:end;margin-bottom:10px}
+    .title{display:flex;justify-content:center;align-items:center}
+    .title .box{padding:8px 16px;border-bottom:2px solid #222;font-weight:700;font-size:20px;letter-spacing:.5px}
+    .datebox{justify-self:end}
+    .datebox table{border-collapse:collapse;width:320px}
+    .datebox td{border:1.5px solid var(--line-strong);padding:7px 10px;font-size:13px}
+    .datebox td:first-child{width:74px;background:var(--soft);font-weight:700}
+
+    input[type="date"],input[type="number"],input[type="text"],textarea{
+      font:inherit;border:1px solid #999;border-radius:0;padding:5px 6px;background:#fff
+    }
+    input[type="number"]{width:68px;text-align:right}
+    input.small{width:54px}
+    input.wide{width:100%}
+
+    textarea{width:100%;resize:none;border:1px solid #999;border-top:none;min-height:120px}
+    #asWorkToday,#asWorkTomorrow{min-height:92px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;margin:8px 0 2px 0}
+    button{font:inherit;border:1px solid #c7c7c7;background:#f6f6f6;border-radius:10px;padding:8px 10px;cursor:pointer}
+    button.primary{background:#111;color:#fff;border-color:#111}
+    button:active{transform:translateY(1px)}
+    .hint{font-size:12px;color:var(--muted)}
+    .sec{margin-top:12px}
+    .sec .head{display:flex;gap:10px;align-items:center;margin:0 0 6px 0}
+    .chk{font-weight:800}
+    .secname{font-weight:800}
+
+    table.form{border-collapse:collapse;width:100%;table-layout:fixed;outline:1.8px solid var(--line-strong);outline-offset:-1px}
+    table.form th, table.form td{border:1px solid var(--line);padding:5px 6px;font-size:12.5px;vertical-align:middle}
+    table.form th{background:var(--soft);font-weight:800}
+    td.center{text-align:center}
+    td.num{text-align:right}
+    td.hi{background:var(--sum);font-weight:800}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .hr{height:6px;background:#9a9a9a;margin:12px 0 10px 0}
+    .subnote{font-size:11.5px;color:#444;margin-top:6px}
+
+    .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);
+      background:#111;color:#fff;padding:10px 12px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .16s ease}
+    .toast.show{opacity:1}
+
+    /* 출력: A4 한 장에 맞춤 */
+    @page{size:A4 portrait;margin:10mm}
+    @media print{
+      body{background:#fff}
+      .page{max-width:none;margin:0;padding:0}
+      .sheet{border:none;box-shadow:none;border-radius:0;padding:0}
+      .toolbar,.hint,.no-print{display:none !important}
+
+      /* PDF처럼 작성일만 보이게 (현장 줄 숨김) */
+      .datebox tr.site-row{display:none}
+
+      /* 한 장에 맞추기: 폭/여백/글자 조정 */
+      .sheet{width:190mm}
+      table.form th, table.form td{font-size:11px;padding:4px 5px}
+      .title .box{font-size:18px}
+      textarea{min-height:112px}
+      #asWorkToday,#asWorkTomorrow{min-height:84px}
+      .hr{height:6px;margin:10px 0 8px 0}
+    }
+  
+    /* AS 표 내부 '세대 / 건' 한 줄 고정 */
+    #tblAs td.as-nowrap, #tblAs td.as-nowrap *{white-space:nowrap;}
+    #tblAs td.as-nowrap input.small{width:52px;}  /* 살짝 줄여서 줄바꿈 방지 */
+
+  
+    .badge{display:inline-block;padding:2px 8px;border:1px solid #d1d5db;border-radius:999px;background:#fff;font-size:12px;color:var(--muted);vertical-align:middle}
+  </style>
+
+</head>
+<body>
+  <div class="page">
+    <div class="sheet">
+      <div class="top">
+        <div class="title"><div class="box">[　] 일일업무일지 <span class="badge" id="cloudBadge">클라우드</span></div></div>
+        <div class="datebox">
+          <table>
+            <tr>
+              <td>작성일 :</td>
+              <td><input id="reportDate" type="date" class="wide" /></td>
+            </tr>
+            <tr class="site-row">
+              <td>현장 :</td>
+              <td><input id="siteName" type="text" class="wide" placeholder="예) ○○아파트" /></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="toolbar no-print">
+        <span class="hint" id="syncState">클라우드 연결 확인중…</span>
+        <span style="flex:1"></span>
+        <span class="hint">저장: 브라우저(LocalStorage). 공유/권한/서버 저장은 다음 단계에서 적용 가능</span>
+        <span style="flex:1"></span>
+        <button id="btnToday">오늘</button>
+        <button id="btnCopyPrev">전일 복사</button>
+        <button class="primary" id="btnSave">저장(클라우드)</button>
+        <button id="btnPrint">인쇄</button>
+        <button id="btnExport">내보내기(JSON)</button>
+        <button id="btnImport">가져오기(JSON)</button>
+        <input id="fileImport" type="file" accept="application/json" style="display:none" />
+      </div>
+
+      <!-- □ 근무현황 -->
+      <section class="sec">
+        <div class="head">
+          <div class="chk">□</div><div class="secname">근무현황</div>
+          <div class="hint">※ 금일만 입력 → 누계 자동합산</div>
+        </div>
+
+        <table class="form" id="tblWork">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:70px">구분</th>
+              <th colspan="2">공실세대 입주촉진</th>
+              <th colspan="4">임대 연장계약</th>
+              <th colspan="2">AS</th>
+              <th colspan="2">합계</th>
+            </tr>
+            <tr>
+              <th colspan="2">본부장</th>
+              <th colspan="2">상담사</th>
+              <th colspan="2">사무보조</th>
+              <th colspan="2">매니저</th>
+              <th>금일<br/>소계</th>
+              <th>투입<br/>누계</th>
+            </tr>
+            <tr>
+              <th></th>
+              <th>금일</th><th>누계</th>
+              <th>금일</th><th>누계</th>
+              <th>금일</th><th>누계</th>
+              <th>금일</th><th>누계</th>
+              <th></th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="center" style="background:var(--soft);font-weight:800">인원</td>
+              <td class="center"><input type="number" min="0" step="1" data-sec="work" data-key="본부장" /></td>
+              <td class="num" data-cum="work:본부장">0</td>
+
+              <td class="center"><input type="number" min="0" step="1" data-sec="work" data-key="상담사" /></td>
+              <td class="num" data-cum="work:상담사">0</td>
+
+              <td class="center"><input type="number" min="0" step="1" data-sec="work" data-key="사무보조" /></td>
+              <td class="num" data-cum="work:사무보조">0</td>
+
+              <td class="center"><input type="number" min="0" step="1" data-sec="work" data-key="매니저" /></td>
+              <td class="num" data-cum="work:매니저">0</td>
+
+              <td class="num" data-today-sum="work">0</td>
+              <td class="num" data-cum-sum="work">0</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <div class="grid2">
+        <!-- □ 임대 연장계약 관리 -->
+        <section class="sec">
+          <div class="head">
+            <div class="chk">□</div><div class="secname">임대 연장계약 관리</div>
+          </div>
+
+          <table class="form" id="tblExtend">
+            <thead>
+              <tr>
+                <th style="width:54px">구분</th>
+                <th style="width:62px">세대수</th>
+                <th colspan="3">연장계약</th>
+                <th style="width:80px">비고</th>
+              </tr>
+              <tr>
+                <th></th><th></th>
+                <th>전일</th>
+                <th>금일</th>
+                <th>누계</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <!-- □ 공실세대 관리 -->
+        <section class="sec">
+          <div class="head">
+            <div class="chk">□</div><div class="secname">공실세대 관리</div>
+          </div>
+
+          <table class="form" id="tblVac">
+            <thead>
+              <tr>
+                <th style="width:54px">구분</th>
+                <th colspan="1">전일현황</th>
+                <th colspan="3">금일현황</th>
+                <th style="width:80px">공실율</th>
+              </tr>
+              <tr>
+                <th></th>
+                <th>공실누계</th>
+                <th>계약해제</th>
+                <th>신규계약</th>
+                <th class="hi">공실합계</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </div>
+
+      <div class="grid2">
+        <!-- □ 부동산 MGM 현황 -->
+        <section class="sec">
+          <div class="head">
+            <div class="chk">□</div><div class="secname">부동산 MGM 현황</div>
+          </div>
+
+          <table class="form" id="tblMgm">
+            <thead>
+              <tr>
+                <th style="width:54px">구분</th>
+                <th>공실수량</th>
+                <th>금일계약</th>
+                <th>계약누계</th>
+                <th>금액누계</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="subnote">※ 공실수량은 “공실세대 관리”의 공실합계를 자동 반영합니다.</div>
+        </section>
+
+        <!-- □ 금일 상담 현황 -->
+        <section class="sec">
+          <div class="head">
+            <div class="chk">□</div><div class="secname">금일 상담 현황</div>
+          </div>
+
+          <table class="form" id="tblCounsel">
+            <thead>
+              <tr>
+                <th>전화상담</th>
+                <th>대면상담</th>
+                <th>스케줄예약</th>
+                <th>업체상담</th>
+                <th>계</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="center"><input class="small" type="number" min="0" step="1" data-sec="counsel" data-key="전화상담" /></td>
+                <td class="center"><input class="small" type="number" min="0" step="1" data-sec="counsel" data-key="대면상담" /></td>
+                <td class="center"><input class="small" type="number" min="0" step="1" data-sec="counsel" data-key="스케줄예약" /></td>
+                <td class="center"><input class="small" type="number" min="0" step="1" data-sec="counsel" data-key="업체상담" /></td>
+                <td class="num" data-sum="counsel">0</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- □ 분양 업무보고 -->
+      <section class="sec">
+        <div class="head">
+          <div class="chk">□</div><div class="secname">분양 업무보고</div>
+        </div>
+
+        <table class="form">
+          <thead>
+            <tr>
+              <th>ㆍ연장계약 / 공실세대 입주촉진</th>
+              <th class="center">금일</th>
+              <th class="center">명일</th>
+            </tr>
+          </thead>
+        </table>
+        <div class="grid2" style="gap:10px;margin-top:-1px">
+          <textarea id="salesToday" placeholder="금일 업무보고"></textarea>
+          <textarea id="salesTomorrow" placeholder="명일 업무계획"></textarea>
+        </div>
+      </section>
+
+      <div class="hr"></div>
+
+      <!-- □ 세대 AS현황 -->
+      <section class="sec">
+        <div class="head">
+          <div class="chk">□</div><div class="secname">세대 AS현황</div>
+          <div class="hint">※ “세대/건” 금일만 입력 → 누계/처리율 자동</div>
+        </div>
+
+        <table class="form" id="tblAs">
+          <thead>
+            <tr>
+              <th style="width:110px">공종</th>
+              <th style="width:150px">금일접수</th>
+              <th style="width:150px">접수누계</th>
+              <th style="width:150px">금일처리</th>
+              <th style="width:150px">처리누계</th>
+              <th style="width:72px">처리율</th>
+              <th>특이사항</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div class="subnote">＊하자처리 완료사항 작업종료후 확인 과정 필요하므로, 처리일 +1일후 적용(원본 양식 문구)</div>
+      </section>
+
+      <!-- □ AS작업 내용 -->
+      <section class="sec">
+        <div class="head">
+          <div class="chk">□</div><div class="secname">AS작업 내용</div>
+        </div>
+        <table class="form">
+          <thead>
+            <tr>
+              <th class="center">금일</th>
+              <th class="center">명일</th>
+            </tr>
+          </thead>
+        </table>
+        <div class="grid2" style="gap:10px;margin-top:-1px">
+          <textarea id="asWorkToday" placeholder="AS 작업 내용(금일)"></textarea>
+          <textarea id="asWorkTomorrow" placeholder="AS 작업 내용(명일)"></textarea>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">저장됨</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "dailyReports_pdfLike_v1";
+
+  
+
+  // =========================
+  // Supabase (로그인 없음 / 공용 저장소)
+  // =========================
+  const SUPABASE_URL = "PASTE_YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY";
+  const supabaseReady = (SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 30);
+  const { createClient } = window.supabase || {};
+  const supabase = (supabaseReady && createClient) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  const USE_LOCAL_CACHE = true; // 오프라인 대비 캐시
+
+  async function cloudHealth(){
+    if(!supabase) return false;
+    try{
+      const { error } = await supabase.from("daily_reports_public").select("report_date").limit(1);
+      return !error;
+    }catch(e){
+      return false;
+    }
+  }
+
+  async function cloudLoadRange(toDate){
+    const { data, error } = await supabase
+      .from("daily_reports_public")
+      .select("report_date,payload")
+      .lte("report_date", toDate)
+      .order("report_date", { ascending: true });
+    if(error) throw error;
+    return data || [];
+  }
+
+  async function cloudSave(dateStr, payload){
+    const { error } = await supabase
+      .from("daily_reports_public")
+      .upsert({ report_date: dateStr, payload }, { onConflict: "report_date" });
+    if(error) throw error;
+    return true;
+  }
+
+const TYPES = [
+    {k:"79", households:150},
+    {k:"84A", households:571},
+    {k:"84B", households:150},
+    {k:"계", households:871}
+  ];
+
+  const WORK_KEYS = ["본부장","상담사","사무보조","매니저"];
+
+  const AS_TRADES = ["마루","일반, 주방가구","PL창호","목창호","타일","도배","주방상판","가전","전기,조명,홈넷","설비","기타","합 계"];
+
+  const $ = (id)=>document.getElementById(id);
+  const toast = (msg)=>{
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"), 1200);
+  };
+
+  const isoToday = ()=>{
+    const d = new Date();
+    const tzOff = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - tzOff*60000);
+    return local.toISOString().slice(0,10);
+  };
+
+  const prevDateStr = (dateStr)=>{
+    const d = new Date(dateStr+"T00:00:00");
+    d.setDate(d.getDate()-1);
+    const tzOff = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - tzOff*60000);
+    return local.toISOString().slice(0,10);
+  };
+
+  function loadAll(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+    catch(e){ return {}; }
+  }
+  function saveAll(all){ localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); }
+
+  function ensure(all, date){
+    if(!all[date]){
+      all[date] = {
+        siteName:"",
+        work:{},
+        extend:{},    // { "79": {today:0, note:""} , ... }
+        vacancy:{},   // { "79": {cancel:0, new:0}, ... }
+        mgm:{},       // { "79": {todayContract:0, todayAmount:0}, ... }
+        counsel:{전화상담:0,대면상담:0,스케줄예약:0,업체상담:0},
+        salesToday:"", salesTomorrow:"",
+        as:{},        // trade: {recvTodayH:0, recvTodayC:0, procTodayH:0, procTodayC:0, note:""}
+        asWorkToday:"", asWorkTomorrow:""
+      };
+    }
+    // defaults
+    WORK_KEYS.forEach(k=>{ if(all[date].work[k]==null) all[date].work[k]=0; });
+
+    TYPES.forEach(t=>{
+      all[date].extend[t.k] = all[date].extend[t.k] || {today:0, note:""};
+      all[date].extend[t.k].today = Number(all[date].extend[t.k].today||0);
+
+      all[date].vacancy[t.k] = all[date].vacancy[t.k] || {cancel:0, new:0};
+      all[date].vacancy[t.k].cancel = Number(all[date].vacancy[t.k].cancel||0);
+      all[date].vacancy[t.k].new = Number(all[date].vacancy[t.k].new||0);
+
+      all[date].mgm[t.k] = all[date].mgm[t.k] || {todayContract:0, todayAmount:0};
+      all[date].mgm[t.k].todayContract = Number(all[date].mgm[t.k].todayContract||0);
+      all[date].mgm[t.k].todayAmount = Number(all[date].mgm[t.k].todayAmount||0);
+    });
+
+    AS_TRADES.forEach(tr=>{
+      all[date].as[tr] = all[date].as[tr] || {recvTodayH:0,recvTodayC:0,procTodayH:0,procTodayC:0,note:""};
+      const row = all[date].as[tr];
+      ["recvTodayH","recvTodayC","procTodayH","procTodayC"].forEach(f=>row[f]=Number(row[f]||0));
+      row.note = row.note || "";
+    });
+
+    all[date].siteName = all[date].siteName || "";
+    all[date].salesToday = all[date].salesToday || "";
+    all[date].salesTomorrow = all[date].salesTomorrow || "";
+    all[date].asWorkToday = all[date].asWorkToday || "";
+    all[date].asWorkTomorrow = all[date].asWorkTomorrow || "";
+    all[date].counsel = all[date].counsel || {전화상담:0,대면상담:0,스케줄예약:0,업체상담:0};
+    return all;
+  }
+
+  // state
+  let state = {
+    date:"",
+    siteName:"",
+    work:{},
+    extend:{},
+    vacancy:{},
+    mgm:{},
+    counsel:{전화상담:0,대면상담:0,스케줄예약:0,업체상담:0},
+    salesToday:"",
+    salesTomorrow:"",
+    as:{},
+    asWorkToday:"",
+    asWorkTomorrow:""
+  };
+
+  // ----- build tables -----
+  function buildExtend(){
+    const tb = $("tblExtend").querySelector("tbody");
+    tb.innerHTML = "";
+    TYPES.forEach((t, idx)=>{
+      const tr = document.createElement("tr");
+      const isTotal = (t.k==="계");
+      tr.innerHTML = `
+        <td class="center ${isTotal?'hi':''}">${t.k}</td>
+        <td class="center ${isTotal?'hi':''}">${t.households}</td>
+        <td class="center ${isTotal?'hi':''}" data-prev="extend:${t.k}">0</td>
+        <td class="center ${isTotal?'hi':''}">
+          <input type="number" min="0" step="1" data-sec="extend" data-type="${t.k}" class="small" ${isTotal?'disabled':''}/>
+        </td>
+        <td class="center ${isTotal?'hi':''}" data-cum="extend:${t.k}">0</td>
+        <td class="${isTotal?'hi':''}">
+          <input type="text" data-sec="extendNote" data-type="${t.k}" class="wide" placeholder="" ${isTotal?'disabled':''}/>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  function buildVac(){
+    const tb = $("tblVac").querySelector("tbody");
+    tb.innerHTML = "";
+    TYPES.forEach(t=>{
+      const isTotal = (t.k==="계");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="center ${isTotal?'hi':''}">${t.k}</td>
+        <td class="center ${isTotal?'hi':''}" data-prev="vac:${t.k}">0</td>
+        <td class="center ${isTotal?'hi':''}">
+          <input type="number" min="0" step="1" data-sec="vacCancel" data-type="${t.k}" class="small" ${isTotal?'disabled':''}/>
+        </td>
+        <td class="center ${isTotal?'hi':''}">
+          <input type="number" min="0" step="1" data-sec="vacNew" data-type="${t.k}" class="small" ${isTotal?'disabled':''}/>
+        </td>
+        <td class="center hi" data-today="vacTotal:${t.k}">0</td>
+        <td class="center ${isTotal?'hi':''}" data-rate="vac:${t.k}">0%</td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  function buildMgm(){
+    const tb = $("tblMgm").querySelector("tbody");
+    tb.innerHTML = "";
+    TYPES.forEach(t=>{
+      const isTotal = (t.k==="계");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="center ${isTotal?'hi':''}">${t.k}</td>
+        <td class="center ${isTotal?'hi':''}" data-vacref="mgmVac:${t.k}">0</td>
+        <td class="center ${isTotal?'hi':''}">
+          <input type="number" min="0" step="1" data-sec="mgmContract" data-type="${t.k}" class="small" ${isTotal?'disabled':''}/>
+        </td>
+        <td class="center ${isTotal?'hi':''}" data-cum="mgmContract:${t.k}">0</td>
+        <td class="center ${isTotal?'hi':''}" data-cum="mgmAmount:${t.k}">0</td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  function buildAs(){
+    const tb = $("tblAs").querySelector("tbody");
+    tb.innerHTML = "";
+    AS_TRADES.forEach(trade=>{
+      const isTotal = (trade==="합 계");
+      const tr = document.createElement("tr");
+      const cls = isTotal ? "hi" : "";
+      tr.innerHTML = `
+        <td class="center ${cls}">${trade}</td>
+
+        <td class="center ${cls} as-nowrap">
+          <input class="small" type="number" min="0" step="1" data-sec="as" data-trade="${trade}" data-field="recvTodayH" ${isTotal?'disabled':''}/> 세대 /
+          <input class="small" type="number" min="0" step="1" data-sec="as" data-trade="${trade}" data-field="recvTodayC" ${isTotal?'disabled':''}/> 건
+        </td>
+
+        <td class="center ${cls}" data-cum="asRecv:${trade}">0 세대 / 0 건</td>
+
+        <td class="center ${cls} as-nowrap">
+          <input class="small" type="number" min="0" step="1" data-sec="as" data-trade="${trade}" data-field="procTodayH" ${isTotal?'disabled':''}/> 세대 /
+          <input class="small" type="number" min="0" step="1" data-sec="as" data-trade="${trade}" data-field="procTodayC" ${isTotal?'disabled':''}/> 건
+        </td>
+
+        <td class="center ${cls}" data-cum="asProc:${trade}">0 세대 / 0 건</td>
+
+        <td class="center ${cls}" data-rate="as:${trade}">0%</td>
+
+        <td class="${cls}">
+          <input type="text" data-sec="as" data-trade="${trade}" data-field="note" class="wide" ${isTotal?'disabled':''}/>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  // ----- calculations -----
+  function sumWorkUpTo(all, date, key){
+    let sum = 0;
+    Object.keys(all).sort().forEach(ds=>{
+      if(ds <= date) sum += Number(all[ds]?.work?.[key]||0);
+    });
+    return sum;
+  }
+
+  function sumExtendUpTo(all, date, type){
+    let sum = 0;
+    Object.keys(all).sort().forEach(ds=>{
+      if(ds <= date) sum += Number(all[ds]?.extend?.[type]?.today||0);
+    });
+    return sum;
+  }
+
+  // Vacancy is a state computed from flows:
+  // vacTotal(date) = vacTotal(prev) + cancel - new
+  function computeVacTotal(all, date, type){
+    const dates = Object.keys(all).sort();
+    let total = 0;
+    for(const ds of dates){
+      if(ds > date) break;
+      const row = all[ds]?.vacancy?.[type];
+      if(!row) continue;
+      total = total + Number(row.cancel||0) - Number(row.new||0);
+    }
+    return total;
+  }
+
+  function computeVacPrev(all, date, type){
+    const prev = prevDateStr(date);
+    return computeVacTotal(all, prev, type);
+  }
+
+  function sumMgmContractUpTo(all, date, type){
+    let sum = 0;
+    Object.keys(all).sort().forEach(ds=>{
+      if(ds <= date) sum += Number(all[ds]?.mgm?.[type]?.todayContract||0);
+    });
+    return sum;
+  }
+  function sumMgmAmountUpTo(all, date, type){
+    let sum = 0;
+    Object.keys(all).sort().forEach(ds=>{
+      if(ds <= date) sum += Number(all[ds]?.mgm?.[type]?.todayAmount||0);
+    });
+    return sum;
+  }
+
+  function sumAsUpTo(all, date, trade, field){
+    let sum = 0;
+    Object.keys(all).sort().forEach(ds=>{
+      if(ds <= date) sum += Number(all[ds]?.as?.[trade]?.[field]||0);
+    });
+    return sum;
+  }
+
+  function recalc(){
+    const all0 = ensure(loadAll(), state.date);
+    const all = all0;
+
+    // --- work cum + totals ---
+    let workTodaySum = 0;
+    let workCumSum = 0;
+    WORK_KEYS.forEach(k=>{
+      workTodaySum += Number(state.work[k]||0);
+      const cum = sumWorkUpTo(all, state.date, k);
+      workCumSum += cum;
+      const cell = document.querySelector(`[data-cum="work:${k}"]`);
+      if(cell) cell.textContent = String(cum);
+    });
+    document.querySelectorAll(`[data-today-sum="work"]`).forEach(el=>el.textContent = String(workTodaySum));
+    document.querySelectorAll(`[data-cum-sum="work"]`).forEach(el=>el.textContent = String(workCumSum));
+
+    // --- extend prev/cum/total row ---
+    let extendTodayTotal = 0;
+    let extendPrevTotal = 0;
+    let extendCumTotal = 0;
+
+    TYPES.forEach(t=>{
+      if(t.k==="계") return;
+      const prev = sumExtendUpTo(all, prevDateStr(state.date), t.k);
+      const today = Number(state.extend[t.k]?.today||0);
+      const cum = prev + today;
+
+      extendTodayTotal += today;
+      extendPrevTotal += prev;
+      extendCumTotal += cum;
+
+      const cPrev = document.querySelector(`[data-prev="extend:${t.k}"]`);
+      const cCum  = document.querySelector(`[data-cum="extend:${t.k}"]`);
+      if(cPrev) cPrev.textContent = String(prev);
+      if(cCum)  cCum.textContent  = String(cum);
+    });
+
+    // total row "계"
+    const cPrevT = document.querySelector(`[data-prev="extend:계"]`);
+    const cCumT  = document.querySelector(`[data-cum="extend:계"]`);
+    if(cPrevT) cPrevT.textContent = String(extendPrevTotal);
+    const extTodayCell = document.querySelector(`input[data-sec="extend"][data-type="계"]`);
+    if(extTodayCell) extTodayCell.value = String(extendTodayTotal);
+    if(cCumT) cCumT.textContent = String(extendCumTotal);
+
+    // --- vacancy prev/today/total, rate ---
+    let vacPrevSum=0, vacCancelSum=0, vacNewSum=0, vacTotalSum=0;
+
+    TYPES.forEach(t=>{
+      if(t.k==="계") return;
+      const prev = computeVacPrev(all, state.date, t.k);
+      const cancel = Number(state.vacancy[t.k]?.cancel||0);
+      const nw = Number(state.vacancy[t.k]?.new||0);
+      const total = prev + cancel - nw;
+
+      vacPrevSum += prev; vacCancelSum += cancel; vacNewSum += nw; vacTotalSum += total;
+
+      const cPrev = document.querySelector(`[data-prev="vac:${t.k}"]`);
+      const cTot  = document.querySelector(`[data-today="vacTotal:${t.k}"]`);
+      const cRate = document.querySelector(`[data-rate="vac:${t.k}"]`);
+      if(cPrev) cPrev.textContent = String(prev);
+      if(cTot)  cTot.textContent  = String(total);
+
+      const households = TYPES.find(x=>x.k===t.k)?.households || 0;
+      const rate = households>0 ? Math.round((total/households)*1000)/10 : 0;
+      if(cRate) cRate.textContent = rate.toFixed(1) + "%";
+    });
+
+    // total row vacancy
+    const cPrevV = document.querySelector(`[data-prev="vac:계"]`);
+    const cTotV  = document.querySelector(`[data-today="vacTotal:계"]`);
+    const cRateV = document.querySelector(`[data-rate="vac:계"]`);
+    if(cPrevV) cPrevV.textContent = String(vacPrevSum);
+    if(cTotV)  cTotV.textContent  = String(vacTotalSum);
+    const totalHouseholds = TYPES.find(x=>x.k==="계")?.households || 0;
+    const rateTotal = totalHouseholds>0 ? Math.round((vacTotalSum/totalHouseholds)*1000)/10 : 0;
+    if(cRateV) cRateV.textContent = rateTotal.toFixed(1) + "%";
+
+    const inCancelT = document.querySelector(`input[data-sec="vacCancel"][data-type="계"]`);
+    const inNewT = document.querySelector(`input[data-sec="vacNew"][data-type="계"]`);
+    if(inCancelT) inCancelT.value = String(vacCancelSum);
+    if(inNewT) inNewT.value = String(vacNewSum);
+
+    // --- mgm: vac ref + cum ---
+    let mgmTodaySum = 0, mgmContractCumSum = 0, mgmAmountCumSum = 0;
+
+    TYPES.forEach(t=>{
+      if(t.k==="계") return;
+
+      const vac = Number(document.querySelector(`[data-today="vacTotal:${t.k}"]`)?.textContent || "0");
+      const vacCell = document.querySelector(`[data-vacref="mgmVac:${t.k}"]`);
+      if(vacCell) vacCell.textContent = String(vac);
+
+      const todayC = Number(state.mgm[t.k]?.todayContract||0);
+      mgmTodaySum += todayC;
+
+      const cumC = sumMgmContractUpTo(all, state.date, t.k);
+      const cumA = sumMgmAmountUpTo(all, state.date, t.k);
+
+      mgmContractCumSum += cumC;
+      mgmAmountCumSum += cumA;
+
+      const c1 = document.querySelector(`[data-cum="mgmContract:${t.k}"]`);
+      const c2 = document.querySelector(`[data-cum="mgmAmount:${t.k}"]`);
+      if(c1) c1.textContent = String(cumC);
+      if(c2) c2.textContent = String(cumA);
+    });
+
+    // totals mgm row
+    const vacSumCell = document.querySelector(`[data-vacref="mgmVac:계"]`);
+    if(vacSumCell) vacSumCell.textContent = String(vacTotalSum);
+
+    const mgmTodayCell = document.querySelector(`input[data-sec="mgmContract"][data-type="계"]`);
+    if(mgmTodayCell) mgmTodayCell.value = String(mgmTodaySum);
+
+    const cCumC = document.querySelector(`[data-cum="mgmContract:계"]`);
+    const cCumA = document.querySelector(`[data-cum="mgmAmount:계"]`);
+    if(cCumC) cCumC.textContent = String(mgmContractCumSum);
+    if(cCumA) cCumA.textContent = String(mgmAmountCumSum);
+
+    // --- counsel total ---
+    const s = ["전화상담","대면상담","스케줄예약","업체상담"].reduce((a,k)=>a+Number(state.counsel[k]||0),0);
+    const sumCell = document.querySelector(`[data-sum="counsel"]`);
+    if(sumCell) sumCell.textContent = String(s);
+
+    // --- AS totals line ---
+    // 합계 = 나머지 합
+    let recvH=0, recvC=0, procH=0, procC=0;
+    AS_TRADES.forEach(tr=>{
+      if(tr==="합 계") return;
+      recvH += Number(state.as[tr]?.recvTodayH||0);
+      recvC += Number(state.as[tr]?.recvTodayC||0);
+      procH += Number(state.as[tr]?.procTodayH||0);
+      procC += Number(state.as[tr]?.procTodayC||0);
+    });
+    state.as["합 계"] = state.as["합 계"] || {recvTodayH:0,recvTodayC:0,procTodayH:0,procTodayC:0,note:""};
+    state.as["합 계"].recvTodayH = recvH;
+    state.as["합 계"].recvTodayC = recvC;
+    state.as["합 계"].procTodayH = procH;
+    state.as["합 계"].procTodayC = procC;
+
+    // fill disabled inputs for 합계
+    ["recvTodayH","recvTodayC","procTodayH","procTodayC"].forEach(f=>{
+      const inp = document.querySelector(`input[data-sec="as"][data-trade="합 계"][data-field="${f}"]`);
+      if(inp) inp.value = String(state.as["합 계"][f]||0);
+    });
+
+    // AS cumulative cells + rate
+    AS_TRADES.forEach(tr=>{
+      const rCumH = sumAsUpTo(all, state.date, tr, "recvTodayH");
+      const rCumC = sumAsUpTo(all, state.date, tr, "recvTodayC");
+      const pCumH = sumAsUpTo(all, state.date, tr, "procTodayH");
+      const pCumC = sumAsUpTo(all, state.date, tr, "procTodayC");
+
+      const cR = document.querySelector(`[data-cum="asRecv:${tr}"]`);
+      const cP = document.querySelector(`[data-cum="asProc:${tr}"]`);
+      if(cR) cR.textContent = `${rCumH} 세대 / ${rCumC} 건`;
+      if(cP) cP.textContent = `${pCumH} 세대 / ${pCumC} 건`;
+
+      const rate = (rCumC>0) ? Math.round((pCumC / rCumC)*100) : 0;
+      const cRate = document.querySelector(`[data-rate="as:${tr}"]`);
+      if(cRate) cRate.textContent = rate + "%";
+    });
+
+    // persist computed totals row for mgm/vac? (not necessary)
+  }
+
+  // ----- rendering -----
+  function render(dateStr){
+    const all = ensure(loadAll(), dateStr);
+    const d = all[dateStr];
+
+    state.date = dateStr;
+    state.siteName = d.siteName || "";
+    state.work = Object.assign({}, d.work || {});
+    state.extend = JSON.parse(JSON.stringify(d.extend || {}));
+    state.vacancy = JSON.parse(JSON.stringify(d.vacancy || {}));
+    state.mgm = JSON.parse(JSON.stringify(d.mgm || {}));
+    state.counsel = Object.assign({전화상담:0,대면상담:0,스케줄예약:0,업체상담:0}, d.counsel || {});
+    state.salesToday = d.salesToday || "";
+    state.salesTomorrow = d.salesTomorrow || "";
+    state.as = JSON.parse(JSON.stringify(d.as || {}));
+    state.asWorkToday = d.asWorkToday || "";
+    state.asWorkTomorrow = d.asWorkTomorrow || "";
+
+    $("siteName").value = state.siteName;
+    $("salesToday").value = state.salesToday;
+    $("salesTomorrow").value = state.salesTomorrow;
+    $("asWorkToday").value = state.asWorkToday;
+    $("asWorkTomorrow").value = state.asWorkTomorrow;
+
+    // work inputs
+    document.querySelectorAll(`input[data-sec="work"]`).forEach(inp=>{
+      const k = inp.dataset.key;
+      inp.value = String(Number(state.work[k]||0));
+    });
+
+    // extend inputs
+    TYPES.forEach(t=>{
+      const inToday = document.querySelector(`input[data-sec="extend"][data-type="${t.k}"]`);
+      const inNote = document.querySelector(`input[data-sec="extendNote"][data-type="${t.k}"]`);
+      if(inToday) inToday.value = String(Number(state.extend[t.k]?.today||0));
+      if(inNote) inNote.value = state.extend[t.k]?.note || "";
+    });
+
+    // vacancy inputs
+    TYPES.forEach(t=>{
+      const inC = document.querySelector(`input[data-sec="vacCancel"][data-type="${t.k}"]`);
+      const inN = document.querySelector(`input[data-sec="vacNew"][data-type="${t.k}"]`);
+      if(inC) inC.value = String(Number(state.vacancy[t.k]?.cancel||0));
+      if(inN) inN.value = String(Number(state.vacancy[t.k]?.new||0));
+    });
+
+    // mgm inputs
+    TYPES.forEach(t=>{
+      const inM = document.querySelector(`input[data-sec="mgmContract"][data-type="${t.k}"]`);
+      if(inM) inM.value = String(Number(state.mgm[t.k]?.todayContract||0));
+    });
+
+    // counsel inputs
+    document.querySelectorAll(`input[data-sec="counsel"]`).forEach(inp=>{
+      const k = inp.dataset.key;
+      inp.value = String(Number(state.counsel[k]||0));
+    });
+
+    // AS inputs
+    AS_TRADES.forEach(tr=>{
+      ["recvTodayH","recvTodayC","procTodayH","procTodayC","note"].forEach(f=>{
+        const inp = document.querySelector(`input[data-sec="as"][data-trade="${tr}"][data-field="${f}"]`);
+        if(!inp) return;
+        if(f==="note") inp.value = state.as[tr]?.note || "";
+        else inp.value = String(Number(state.as[tr]?.[f]||0));
+      });
+    });
+
+    recalc();
+  }
+
+  async function save(){
+    const all = ensure(loadAll(), state.date);
+    all[state.date].siteName = state.siteName || "";
+    all[state.date].work = Object.assign({}, state.work);
+    all[state.date].extend = JSON.parse(JSON.stringify(state.extend));
+    all[state.date].vacancy = JSON.parse(JSON.stringify(state.vacancy));
+    all[state.date].mgm = JSON.parse(JSON.stringify(state.mgm));
+    all[state.date].counsel = Object.assign({}, state.counsel);
+    all[state.date].salesToday = state.salesToday || "";
+    all[state.date].salesTomorrow = state.salesTomorrow || "";
+    all[state.date].as = JSON.parse(JSON.stringify(state.as));
+    all[state.date].asWorkToday = state.asWorkToday || "";
+    all[state.date].asWorkTomorrow = state.asWorkTomorrow || "";
+
+    if(USE_LOCAL_CACHE){
+      saveAll(all);
+    }
+
+    const ss = document.getElementById("syncState");
+    const badge = document.getElementById("cloudBadge");
+
+    if(!supabase){
+      toast("SUPABASE_URL/KEY 설정 필요(로컬 저장)");
+      if(ss) ss.textContent = "SUPABASE 설정 필요 — 로컬 모드";
+      if(badge) badge.textContent = "로컬";
+      recalc();
+      return;
+    }
+
+    try{
+      await cloudSave(state.date, all[state.date]);
+      toast("클라우드 저장됨");
+      if(ss) ss.textContent = "클라우드 저장 완료";
+      if(badge) badge.textContent = "클라우드";
+    }catch(e){
+      console.error(e);
+      toast("클라우드 저장 실패(로컬만 저장)");
+      if(ss) ss.textContent = "클라우드 저장 실패 — 로컬 저장";
+      if(badge) badge.textContent = "로컬";
+    }
+    recalc();
+  }
+
+  function copyPrev(){
+    const all = loadAll();
+    const prev = prevDateStr(state.date);
+    if(!all[prev]){
+      toast("전일 데이터가 없습니다");
+      return;
+    }
+    const p = all[prev];
+    const all2 = ensure(all, state.date);
+
+    // siteName만 복사
+    all2[state.date].siteName = p.siteName || state.siteName || "";
+
+    // 기본: 금일 입력은 0 초기화, 텍스트는 명일 계획만 이어받기(원하면 변경 가능)
+    WORK_KEYS.forEach(k=>all2[state.date].work[k]=0);
+
+    TYPES.forEach(t=>{
+      all2[state.date].extend[t.k] = all2[state.date].extend[t.k] || {today:0,note:""};
+      all2[state.date].extend[t.k].today = 0;
+      all2[state.date].extend[t.k].note = (t.k==="계") ? "" : (p.extend?.[t.k]?.note || "");
+
+      all2[state.date].vacancy[t.k] = all2[state.date].vacancy[t.k] || {cancel:0,new:0};
+      all2[state.date].vacancy[t.k].cancel = 0;
+      all2[state.date].vacancy[t.k].new = 0;
+
+      all2[state.date].mgm[t.k] = all2[state.date].mgm[t.k] || {todayContract:0,todayAmount:0};
+      all2[state.date].mgm[t.k].todayContract = 0;
+      all2[state.date].mgm[t.k].todayAmount = 0;
+    });
+
+    all2[state.date].counsel = {전화상담:0,대면상담:0,스케줄예약:0,업체상담:0};
+
+    AS_TRADES.forEach(tr=>{
+      all2[state.date].as[tr] = all2[state.date].as[tr] || {};
+      all2[state.date].as[tr].recvTodayH = 0;
+      all2[state.date].as[tr].recvTodayC = 0;
+      all2[state.date].as[tr].procTodayH = 0;
+      all2[state.date].as[tr].procTodayC = 0;
+      all2[state.date].as[tr].note = (tr==="합 계") ? "" : (p.as?.[tr]?.note || "");
+    });
+
+    all2[state.date].salesToday = "";
+    all2[state.date].salesTomorrow = p.salesTomorrow || "";
+    all2[state.date].asWorkToday = "";
+    all2[state.date].asWorkTomorrow = p.asWorkTomorrow || "";
+
+    saveAll(all2);
+    render(state.date);
+    toast("전일 템플릿 불러옴");
+  }
+
+  function exportJSON(){
+    const all = loadAll();
+    const blob = new Blob([JSON.stringify(all, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "일일업무일지_데이터.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function importJSON(file){
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const obj = JSON.parse(r.result);
+        saveAll(obj);
+        render(state.date);
+        toast("가져오기 완료");
+      }catch(e){
+        toast("JSON 형식이 아닙니다");
+      }
+    };
+    r.readAsText(file, "utf-8");
+  }
+
+  // ----- input bindings -----
+  document.addEventListener("input", (e)=>{
+    const el = e.target;
+
+    if(el.id==="siteName"){ state.siteName = el.value||""; }
+    if(el.id==="salesToday"){ state.salesToday = el.value||""; }
+    if(el.id==="salesTomorrow"){ state.salesTomorrow = el.value||""; }
+    if(el.id==="asWorkToday"){ state.asWorkToday = el.value||""; }
+    if(el.id==="asWorkTomorrow"){ state.asWorkTomorrow = el.value||""; }
+
+    if(el.dataset.sec==="work"){
+      state.work[el.dataset.key] = Number(el.value||0);
+      recalc();
+    }
+
+    if(el.dataset.sec==="extend"){
+      const t = el.dataset.type;
+      state.extend[t] = state.extend[t] || {today:0, note:""};
+      state.extend[t].today = Number(el.value||0);
+      recalc();
+    }
+    if(el.dataset.sec==="extendNote"){
+      const t = el.dataset.type;
+      state.extend[t] = state.extend[t] || {today:0, note:""};
+      state.extend[t].note = el.value||"";
+    }
+
+    if(el.dataset.sec==="vacCancel"){
+      const t = el.dataset.type;
+      state.vacancy[t] = state.vacancy[t] || {cancel:0,new:0};
+      state.vacancy[t].cancel = Number(el.value||0);
+      recalc();
+    }
+    if(el.dataset.sec==="vacNew"){
+      const t = el.dataset.type;
+      state.vacancy[t] = state.vacancy[t] || {cancel:0,new:0};
+      state.vacancy[t].new = Number(el.value||0);
+      recalc();
+    }
+
+    if(el.dataset.sec==="mgmContract"){
+      const t = el.dataset.type;
+      state.mgm[t] = state.mgm[t] || {todayContract:0,todayAmount:0};
+      state.mgm[t].todayContract = Number(el.value||0);
+      recalc();
+    }
+
+    if(el.dataset.sec==="counsel"){
+      const k = el.dataset.key;
+      state.counsel[k] = Number(el.value||0);
+      recalc();
+    }
+
+    if(el.dataset.sec==="as"){
+      const tr = el.dataset.trade;
+      const f = el.dataset.field;
+      state.as[tr] = state.as[tr] || {recvTodayH:0,recvTodayC:0,procTodayH:0,procTodayC:0,note:""};
+      if(f==="note") state.as[tr].note = el.value||"";
+      else state.as[tr][f] = Number(el.value||0);
+      recalc();
+    }
+  });
+
+  // ----- buttons -----
+  $("btnToday").addEventListener("click", ()=>{
+    const d = isoToday();
+    $("reportDate").value = d;
+    onDate();
+  });
+  $("btnSave").addEventListener("click", ()=>save());
+  $("btnCopyPrev").addEventListener("click", copyPrev);
+  $("btnPrint").addEventListener("click", ()=>window.print());
+  $("btnExport").addEventListener("click", exportJSON);
+  $("btnImport").addEventListener("click", ()=>$("fileImport").click());
+  $("fileImport").addEventListener("change",(e)=>{
+    const f = e.target.files && e.target.files[0];
+    if(f) importJSON(f);
+    e.target.value="";
+  });
+
+  async function onDate(){
+    const d = $("reportDate").value;
+    if(!d) return;
+
+    const ss = document.getElementById("syncState");
+    const badge = document.getElementById("cloudBadge");
+
+    // 로컬 스캐폴드
+    const allLocal = ensure(loadAll(), d);
+    saveAll(allLocal);
+
+    if(!supabase){
+      if(ss) ss.textContent = "SUPABASE 설정 필요 — 로컬 모드";
+      if(badge) badge.textContent = "로컬";
+      render(d);
+      return;
+    }
+
+    try{
+      const rows = await cloudLoadRange(d); // <= d 전체 로드 (누계 일관)
+      if(USE_LOCAL_CACHE){
+        const all = loadAll();
+        for(const r of rows){
+          all[r.report_date] = r.payload;
+        }
+        if(!all[d]) ensure(all, d);
+        saveAll(all);
+      }
+      render(d);
+      if(ss) ss.textContent = "클라우드 동기화됨(누계 포함)";
+      if(badge) badge.textContent = "클라우드";
+    }catch(e){
+      console.error(e);
+      render(d);
+      if(ss) ss.textContent = "클라우드 연결 실패 — 로컬 모드";
+      if(badge) badge.textContent = "로컬";
+    }
+  }
+  $("reportDate").addEventListener("change", onDate);
+
+  // init
+  buildExtend();
+  buildVac();
+  buildMgm();
+  buildAs();
+
+  // 클라우드 상태 표시
+  (async ()=>{
+    const ok = await cloudHealth();
+    const ss = document.getElementById("syncState");
+    const badge = document.getElementById("cloudBadge");
+    if(ok){
+      if(ss) ss.textContent = "클라우드 연결됨";
+      if(badge) badge.textContent = "클라우드";
+    }else{
+      if(ss) ss.textContent = "클라우드 연결 실패 또는 설정 필요 — 로컬 모드";
+      if(badge) badge.textContent = "로컬";
+    }
+  })();
+
+
+  const d0 = isoToday();
+  $("reportDate").value = d0;
+  onDate();
+})();
+</script>
+</body>
+</html>
