@@ -112,6 +112,23 @@
     appearance: none;
   }
 }
+    /* ===== Mobile / Small screen 대응 ===== */
+@media (max-width: 820px){
+  .page{ margin: 10px auto; padding: 0 8px; }
+  .sheet{ padding: 10px; border-radius: 10px; }
+
+  /* 상단: 2열 → 1열 */
+  .top{ grid-template-columns: 1fr; }
+  .datebox{ justify-self: stretch; }
+  .datebox table{ width: 100%; }
+
+  /* 표가 많아서 깨지는 걸 막기: 가로 스크롤 허용 */
+  .grid2{ grid-template-columns: 1fr; }
+  table.form{ min-width: 760px; }    /* 원래 레이아웃 유지 */
+  .sec{ overflow-x: auto; }          /* 표 영역만 가로 스크롤 */
+  .sec::-webkit-scrollbar{ height: 10px; }
+}
+
 
   
     /* AS 표 내부 '세대 / 건' 한 줄 고정 */
