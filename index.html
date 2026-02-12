@@ -387,7 +387,7 @@
               <th style="width:200px">금일처리</th>
               <th style="width:100px">처리누계</th>
               <th style="width:60px">처리율</th>
-              <th style="width:100px">특이사항</th>
+
             </tr>
           </thead>
           <tbody></tbody>
@@ -656,9 +656,7 @@ const TYPES = [
 
         <td class="center ${cls}" data-rate="as:${trade}">0%</td>
 
-        <td class="${cls}">
-          <input type="text" data-sec="as" data-trade="${trade}" data-field="note" class="wide" ${isTotal?'disabled':''}/>
-        </td>
+
       `;
       tb.appendChild(tr);
     });
