@@ -95,7 +95,7 @@
   <div class="page">
     <div class="sheet">
       <div class="top">
-        <div class="title"><div class="box">[군산미장] 일일업무일지 <span class="badge" id="cloudBadge">클라우드</span></div></div>
+        <div class="title"><div class="box">[　] 일일업무일지 <span class="badge" id="cloudBadge">클라우드</span></div></div>
         <div class="datebox">
           <table>
             <tr>
@@ -104,7 +104,7 @@
             </tr>
             <tr class="site-row">
               <td>현장 :</td>
-              <td><input id="siteName" type="text" class="wide" placeholder="군산미장 제일풍경채" /></td>
+              <td><input id="siteName" type="text" class="wide" placeholder="예) ○○아파트" /></td>
             </tr>
           </table>
         </div>
@@ -119,6 +119,8 @@
         <button id="btnCopyPrev">전일 복사</button>
         <button class="primary" id="btnSave">저장(클라우드)</button>
         <button id="btnPrint">인쇄</button>
+        <button id="btnExport">내보내기(JSON)</button>
+        <button id="btnImport">가져오기(JSON)</button>
         <input id="fileImport" type="file" accept="application/json" style="display:none" />
       </div>
 
@@ -317,9 +319,9 @@
           <thead>
             <tr>
               <th style="width:110px">공종</th>
-              <th style="width:200px">금일접수</th>
+              <th style="width:150px">금일접수</th>
               <th style="width:150px">접수누계</th>
-              <th style="width:200px">금일처리</th>
+              <th style="width:150px">금일처리</th>
               <th style="width:150px">처리누계</th>
               <th style="width:72px">처리율</th>
               <th>특이사항</th>
@@ -328,7 +330,7 @@
           <tbody></tbody>
         </table>
 
-        <div class="subnote">＊하자처리 완료사항 작업종료후 확인 과정 필요하므로, 처리일 +1일후 적용</div>
+        <div class="subnote">＊하자처리 완료사항 작업종료후 확인 과정 필요하므로, 처리일 +1일후 적용(원본 양식 문구)</div>
       </section>
 
       <!-- □ AS작업 내용 -->
